@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TSK Smart Fleet 360 — Consultation et filtrage des BL (S2 v1.1)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="badge-sim">[SIMULÉ]</span>
+      <div>
+        <h1>TSK Smart Fleet 360 — Consultation & Filtrage des BL</h1>
+        <p class="subtitle">Prototype local S2 v1.1 · Aligné Modèle BL Bassine v2.2 (n°36) & Vues Papa Waly v2.0 (n°35)</p>
+      </div>
+    </div>
+    <div class="meta-bar">
+      <span id="last-updated">Dernière mise à jour : --</span>
+      <button id="btn-simulate-error" class="btn btn-outline-danger" title="Tester le scénario T05 (Erreur simulée)">Simuler erreur API</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Compteurs synthèse -->
+    <section class="kpi-grid" aria-label="Synthèse des bons de livraison">
+      <div class="kpi-card">
+        <span class="kpi-label">Total BL affichés</span>
+        <strong id="kpi-total" class="kpi-value">0</strong>
+      </div>
+      <div class="kpi-card kpi-warn">
+        <span class="kpi-label">À corriger / Anomalies (C-02..C-13)</span>
+        <strong id="kpi-anomalies" class="kpi-value">0</strong>
+      </div>
+      <div class="kpi-card kpi-info">
+        <span class="kpi-label">Soumis / À examiner</span>
+        <strong id="kpi-examiner" class="kpi-value">0</strong>
+      </div>
+      <div class="kpi-card kpi-ok">
+        <span class="kpi-label">Validés (VALIDE)</span>
+        <strong id="kpi-valides" class="kpi-value">0</strong>
+      </div>
+    </section>
+
+    <!-- Zone de recherche & filtres multicritères harmonisés -->
+    <section class="filter-panel" aria-label="Recherche et filtres">
+      <div class="filter-grid">
+        <div class="field-group field-search">
+          <label for="search-input">Recherche (numero_bl ou bl_id)</label>
+          <input type="text" id="search-input" placeholder="Ex. BL-001, bl-005 ou 1001..." />
+        </div>
+
+        <div class="field-group">
+          <label for="filter-client">Client (client_id)</label>
+          <select id="filter-client">
+            <option value="">Tous les clients</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="filter-mission">Mission (mission_id)</label>
+          <select id="filter-mission">
+            <option value="">Toutes les missions</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="filter-produit">Produit (produit)</label>
+          <select id="filter-produit">
+            <option value="">Tous les produits</option>
+            <option value="GASOIL">GASOIL</option>
+            <option value="ESSENCE">ESSENCE</option>
+            <option value="FIOUL">FIOUL</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="filter-statut-liv">Statut livraison (statut_livraison)</label>
+          <select id="filter-statut-liv">
+            <option value="">Tous</option>
+            <option value="A_PLANIFIER">A_PLANIFIER</option>
+            <option value="EN_COURS">EN_COURS</option>
+            <option value="LIVRE">LIVRE</option>
+            <option value="ANNULE">ANNULE</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="filter-statut-val">Statut validation (statut_validation — 7 statuts v2.2)</label>
+          <select id="filter-statut-val">
+            <option value="">Tous (7 statuts)</option>
+            <option value="SOUMIS">SOUMIS</option>
+            <option value="A_CORRIGER">A_CORRIGER</option>
+            <option value="A_EXAMINER">A_EXAMINER</option>
+            <option value="VALIDE">VALIDE</option>
+            <option value="REJETE">REJETE</option>
+            <option value="DOUBLON_ECARTE">DOUBLON_ECARTE</option>
+            <option value="ANNULE">ANNULE</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="filter-date-debut">Date livraison (Début)</label>
+          <input type="date" id="filter-date-debut" />
+        </div>
+
+        <div class="field-group">
+          <label for="filter-date-fin">Date livraison (Fin)</label>
+          <input type="date" id="filter-date-fin" />
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <label class="checkbox-label">
+          <input type="checkbox" id="filter-anomalie" />
+          Uniquement les BL avec anomalie / code contrôle (C-02 à C-13 / BL-005)
+        </label>
+        <div class="buttons-right">
+          <span id="date-warning" class="inline-error hidden">La date de début dépasse la date de fin.</span>
+          <button id="btn-reset" class="btn btn-secondary">Réinitialiser</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- État Erreur simulée -->
+    <section id="state-error" class="state-box state-error hidden" role="alert">
+      <h3>Impossible de charger les bons de livraison. Réessayez.</h3>
+      <p>Erreur technique simulée (API Mock indisponible — scénario T05). Aucune donnée de production impactée.</p>
+      <button id="btn-retry" class="btn btn-primary">Réessayer</button>
+    </section>
+
+    <!-- État Aucun résultat -->
+    <section id="state-empty" class="state-box state-empty hidden" role="status">
+      <h3>Aucun bon de livraison trouvé</h3>
+      <p>Aucun enregistrement ne correspond aux critères de recherche ou de filtrage sélectionnés.</p>
+    </section>
+
+    <!-- Tableau principal des BL harmonisé -->
+    <section id="table-wrapper" class="table-card">
+      <div class="table-responsive">
+        <table id="bl-table">
+          <thead>
+            <tr>
+              <th>bl_id</th>
+              <th>numero_bl</th>
+              <th>mission_id</th>
+              <th>client_id / Libellé</th>
+              <th>date_livraison</th>
+              <th>produit</th>
+              <th>chauffeur_id</th>
+              <th>vehicule_id</th>
+              <th>volume_livre_l / volume_charge_l</th>
+              <th>statut_livraison</th>
+              <th>statut_validation</th>
+              <th>Contrôle / Anomalie</th>
+              <th>Détail</th>
+            </tr>
+          </thead>
+          <tbody id="bl-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Panneau de détail complet (champs Modèle BL v2.2 + Vues n°35) -->
+    <section id="detail-panel" class="detail-panel hidden" aria-label="Détail du bon de livraison">
+      <div class="detail-header">
+        <h2 id="detail-title">Détail du BL</h2>
+        <button id="btn-close-detail" class="btn btn-secondary">Fermer</button>
+      </div>
+      <div id="detail-content" class="detail-body"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>TSK Smart Fleet 360 — Livrable S2 v1.1 (Mamadou Dian DIALLO) · Harmonisé Modèle BL Bassine v2.2 (7 statuts) · Données synthétiques SIMULATION uniquement.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
